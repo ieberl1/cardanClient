@@ -1,0 +1,17 @@
+<html>Simple <b>Java</b> application that includes a class with <code>main()</code> method
+<pre>This program (eventually) will:
+1. Ask user for input (w x y)
+    w: web server ("s") (www.google.com)
+    x: integer, where "z" = min(x, 1460) is the # of bytes C will send to "s" in every packet containing "w"'s page<br />
+    y: timeout period in milliseconds
+2. Send HTTP GET to "w" using HTTPURLConnection
+3. When a line of the page is received use two threads to:
+    a: Send packets w/ the line to "s" at UDP port 22333 ("z" bytes in each packet)
+    b: Print page contents to terminal
+4. If "c" does not get ACK before timeout period "y" expires; resend the last "z" bytes. If after this resend no
+ACK is received send "FAIL" to "s" and quit.
+5. Whenever an ACK is received from "s" print "ACK".
+6. When all bytes have been sent, print "DONE" and total time taken from beginning of page transfer until last
+ACK has been received, and total number of bytes in the page sent
+</pre>
+</html>
