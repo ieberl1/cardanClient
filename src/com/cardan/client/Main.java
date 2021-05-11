@@ -2,6 +2,7 @@ package com.cardan.client;
 
 import java.io.*;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
 import static java.lang.Math.min;
@@ -18,7 +19,7 @@ import static java.lang.Math.min;
             x: integer, where "z" = min(x, 1460) is the # of bytes C will send to "s" in every packet containing "w"'s page
             y: timeout period in milliseconds
 (DONE)  2. Send HTTP GET to "w" using HTTPURLConnection
-(50%)   3. When a line of the page is received use two threads to:
+(DONE)  3. When a line of the page is received use two threads to:
   (DONE)    a: Send packets w/ the line to localhost:22333 (UDP) ("z" bytes in each packet)
   (DONE)    b: Print page contents to terminal
 (DONE)  4. If "c" does not get ACK before timeout period "y" expires; resend the last "z" bytes. If after this resend no
@@ -37,8 +38,9 @@ public class Main
 	    String strUrl = "";
 	    int desiredBytes = 1460;
 	    int desiredTimeout = 0;
-	    int total_bytes_received = 0;
+	    int total_bytes_successfully_sent = 0;
 	    Scanner scanner = new Scanner(System.in);
+	    java.util.ArrayList<UDPThread> threadArray = new ArrayList<>();
 
 	    System.out.println("Welcome to the cardanClient group project");
 	    System.out.println("Please input desired web server \"w\", max number of bytes to send (less than 1460) " +
@@ -63,12 +65,9 @@ public class Main
         // Get min(x, 1460)
         desiredBytes = min(desiredBytes, 1460);
 
-        System.out.printf("Website: %s%n", strUrl);
-        System.out.printf("DesiredBytes: %d%n", desiredBytes);
-        System.out.printf("Timeout: %d seconds%n", desiredTimeout);
-
-        // Setup our local socket for sending and receiving UDP data
-        DatagramSocket sock = setup_socket(desiredTimeout * 1000);  // convert seconds to milliseconds
+        // System.out.printf("Website: %s%n", strUrl);
+        // System.out.printf("DesiredBytes: %d%n", desiredBytes);
+        // System.out.printf("Timeout: %d seconds%n", desiredTimeout);
 
         try {
             destIP = InetAddress.getLocalHost();
@@ -95,32 +94,34 @@ public class Main
                     }
                     System.out.printf("Line: %s%n", line);
                     // Send packets w/ the line to "s" at UDP port 22333 ("z" bytes in each packet)
-                    int bytes_received = udp_send_receive(sock, destIP, destPort, desiredBytes, line, desiredTimeout);
-                    if(bytes_received > -1) {
-                        total_bytes_received += bytes_received;
-                    }
-                    else {
-                        System.out.println("Failed to receive data!");
-                        System.out.println("Sending 'FAIL' message.");
-                        udp_send(sock, destIP, destPort, "FAIL".getBytes());
-                        sock.close();
-                        System.out.println("Exiting...");
-                        System.exit(-1);
-                    }
+                    UDPThread udpThread = new UDPThread();
+                    threadArray.add(udpThread);
+                    udpThread.setup_socket(desiredTimeout);
+                    udpThread.setDestIp(destIP);
+                    udpThread.setDestPort(destPort);
+                    udpThread.setMaxSendBytes(desiredBytes);
+                    udpThread.setLine(line);
+                    udpThread.start();
+
                 }
-                // Done sending data close socket
-                sock.close();
                 // Set the ending time
                 long endTime = System.nanoTime();
                 double total_time_sec = (endTime - startTime) / 1000000000.0;
+                // Get total bytes successfully send and ACKED
+                for(UDPThread thread : threadArray){
+                    thread.join();  // Makes sure that the thread has finished
+                    total_bytes_successfully_sent += thread.get_total_bytes();
+                }
                 System.out.println("DONE!");
                 System.out.printf("Total time: %.2f seconds%n", total_time_sec);
-                System.out.printf("Total bytes successfully sent: %d%n", total_bytes_received);
+                System.out.printf("Total bytes successfully sent: %d%n", total_bytes_successfully_sent);
             }
             catch(IOException e){
                 System.out.print("Error: ");
                 System.out.println(e.getMessage());
                 System.exit(-1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         }
         catch (MalformedURLException e) {
@@ -131,6 +132,123 @@ public class Main
             e.printStackTrace();
             System.exit(-1);
         }
+    }
+}
+
+class UDPThread extends Thread{
+    DatagramSocket sock = null;
+    InetAddress dest_ip = null;
+    int dest_port = 0;
+    int max_send_bytes = 0;
+    String line = null;
+    int total_bytes_received = 0;
+
+
+    /**
+     * <p>Sets the destination IP address for the class
+     * </p>
+     * @param dest_ip The InetAddress object
+     */
+    void setDestIp(InetAddress dest_ip){
+        this.dest_ip = dest_ip;
+    }
+
+
+    /**
+     * <p>Sets the destination port for the class
+     * </p>
+     * @param dest_port The int port to send packets to
+     */
+    void setDestPort(int dest_port){
+        this.dest_port = dest_port;
+    }
+
+
+    /**
+     * <p>The sets class variable for the maxinum number of bytes to send in one packet
+     * </p>
+     * @param max_send_bytes The int maximum number of bytes to send in one packet
+     */
+    void setMaxSendBytes(int max_send_bytes){
+        this.max_send_bytes = max_send_bytes;
+    }
+
+
+    /**
+     * <p>Sets the class variable for the string to send to the destination
+     * </p>
+     * @param line The string to send to the destination
+     */
+    void setLine(String line){
+        this.line = line;
+    }
+
+
+    /**
+     * <p>Returns the total number of bytes successfully sent (and ACKed)
+     * </p>
+     * @return  the int number of bytes successfully sent (and ACKed)
+     */
+    public int get_total_bytes(){ return total_bytes_received; }
+
+
+    /**
+     * <p>The code to execute when the thread is started. It will verify all needed class variables have been assigned,
+     * and then send the data over udp, wait for the response, and record the number of bytes successfully sent and
+     * ACKed.
+     * </p>
+     */
+    @Override
+    public void run(){
+        try{
+            // Make sure we're ready to run before attempting to run
+            if (sock == null ||
+                    dest_ip == null ||
+                    dest_port == 0 ||
+                    max_send_bytes == 0 ||
+                    line == null){
+                System.out.println("Not ready to start thread!");
+                System.out.println("One of the arguments have not been set");
+                return;
+            }
+
+            int bytes_received = udp_send_receive(sock, dest_ip, dest_port, max_send_bytes, line);
+            if (bytes_received >= 0) {
+                total_bytes_received += bytes_received;
+            } else {
+                System.out.println("Failed to receive data!");
+                System.out.println("Sending 'FAIL' message.");
+                udp_send(sock, dest_ip, dest_port, "FAIL".getBytes());
+                sock.close();
+                System.out.println("Exiting...");
+                System.exit(-1);
+            }
+        }
+        catch (Exception e){
+            System.out.println("Caught the exception!");
+            e.printStackTrace();
+        }
+        sock.close();
+    }
+
+
+    /**
+     * <p>The setup_socket method will create a DatagramSocket object for sending and receiving data. It sets the
+     * timeout of the socket to the timeout specified
+     * </p>
+     * @param timeout   The int timeout in milliseconds to wait for a response
+     */
+    void setup_socket(int timeout){
+        DatagramSocket sock = null;
+        try {
+            sock = new DatagramSocket();
+            sock.setSoTimeout(timeout);
+        }
+        catch (SocketException e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+        this.sock = sock;
     }
 
 
@@ -203,21 +321,20 @@ public class Main
      * @param dest_port The int port to send data to
      * @param max_send_bytes    The maximum number of bytes that can be sent in one packet
      * @param line  The String data to send
-     * @param timeout   The int timeout in seconds to wait for data before the socket will timeout
      * @return  The int number of bytes successfully send and ACKed, or -1 if timeout
      */
-    private static int udp_send_receive(DatagramSocket sock, InetAddress dest_ip, int dest_port, int max_send_bytes, String line, int timeout) {
+    private static int udp_send_receive(DatagramSocket sock, InetAddress dest_ip, int dest_port, int max_send_bytes, String line) {
         int bytes_sent_n_acked = 0;
         int data_len = line.length();
         int bytes_left = line.length();
         byte[] data_to_send = line.getBytes();
-        System.out.printf("Data len is '%s'%n", data_len);
+        // System.out.printf("Data len is '%s'%n", data_len);
         while(bytes_sent_n_acked < data_len) {
             int tmp_bytes_received = 0;
             int bytes_send_len = min(max_send_bytes, bytes_left);
             byte[] curr_data = Arrays.copyOfRange(data_to_send, bytes_sent_n_acked, (bytes_sent_n_acked + bytes_send_len));
-            System.out.printf("Sending byte numbers %d to %d%n", bytes_sent_n_acked, (bytes_sent_n_acked + bytes_send_len));
-            System.out.printf("Sending: %s%n", Arrays.toString(curr_data));
+            // System.out.printf("Sending byte numbers %d to %d%n", bytes_sent_n_acked, (bytes_sent_n_acked + bytes_send_len));
+            // System.out.printf("Sending: %s%n", Arrays.toString(curr_data));
             for (int i = 0; i < 2; i++) {
                 udp_send(sock, dest_ip, dest_port, curr_data);
                 tmp_bytes_received = udp_receive(sock);
@@ -239,24 +356,4 @@ public class Main
         return bytes_sent_n_acked;
     }
 
-
-    /**
-     * <p>The setup_socket method will create a DatagramSocket object for sending and receiving data. It sets the
-     * timeout of the socket to the timeout specified
-     * </p>
-     * @param timeout   The int timeout in milliseconds to wait for a response
-     * @return  The DatagramSocket object. Will exit the application on failure
-     */
-    private static DatagramSocket setup_socket(int timeout){
-        DatagramSocket sock = null;
-        try {
-            sock = new DatagramSocket();
-            sock.setSoTimeout(timeout);
-        }
-        catch (SocketException e) {
-            e.printStackTrace();
-            System.exit(-1);
-        }
-        return sock;
-    }
 }
