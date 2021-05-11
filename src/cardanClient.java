@@ -1,5 +1,3 @@
-package com.cardan.client;
-
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
@@ -35,18 +33,18 @@ public class cardanClient
     public static void main(String[] args) {
         InetAddress destIP;
         int destPort = 22333;
-	    String strUrl = "";
-	    int desiredBytes = 1460;
-	    int desiredTimeout = 0;
-	    int total_bytes_successfully_sent = 0;
-	    Scanner scanner = new Scanner(System.in);
-	    java.util.ArrayList<UDPThread> threadArray = new ArrayList<>();
+        String strUrl = "";
+        int desiredBytes = 1460;
+        int desiredTimeout = 0;
+        int total_bytes_successfully_sent = 0;
+        Scanner scanner = new Scanner(System.in);
+        java.util.ArrayList<UDPThread> threadArray = new ArrayList<>();
 
-	    System.out.println("Welcome to the cardanClient group project");
-	    System.out.println("Please input desired web server \"w\", max number of bytes to send (less than 1460) " +
+        System.out.println("Welcome to the cardanClient group project");
+        System.out.println("Please input desired web server \"w\", max number of bytes to send (less than 1460) " +
                 "\"x\", and desired timeout in seconds \"y\". Use the format: w x y ");
-	    System.out.println("Example: http://www.google.com 123 5");
-	    System.out.print("> ");
+        System.out.println("Example: http://www.google.com 123 5");
+        System.out.print("> ");
 
         try{
             strUrl = scanner.next();
@@ -88,7 +86,6 @@ public class cardanClient
                 reader = new BufferedReader(new InputStreamReader(con.getInputStream()));
                 // Loop through the response and print it to the terminal
                 while ((line = reader.readLine()) != null) {
-                    // todo: Use threading to do the next lines at the same time
                     if(0 >= line.length()) {
                         continue;
                     }
