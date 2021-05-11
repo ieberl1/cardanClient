@@ -29,7 +29,7 @@ import static java.lang.Math.min;
                 ACK has been received, and total number of bytes in the page sent
  */
 
-public class Main
+public class cardanClient
 {
 
     public static void main(String[] args) {
@@ -198,7 +198,6 @@ class UDPThread extends Thread{
      * ACKed.
      * </p>
      */
-    @Override
     public void run(){
         try{
             // Make sure we're ready to run before attempting to run

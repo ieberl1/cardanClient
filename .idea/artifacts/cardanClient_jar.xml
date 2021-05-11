@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="cardanClient:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/cardanClient_jar</output-path>
+    <root id="archive" name="cardanClient.jar">
+      <element id="module-output" name="cardanClient" />
+    </root>
+  </artifact>
+</component>

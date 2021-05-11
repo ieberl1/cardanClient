@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/cardanClient.iml" filepath="$PROJECT_DIR$/cardanClient.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../cardanServer/cardanServer.iml" filepath="$PROJECT_DIR$/../cardanServer/cardanServer.iml" />
     </modules>
   </component>
 </project>
